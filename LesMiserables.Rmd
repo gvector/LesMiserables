@@ -5,26 +5,105 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r libraries, warning=FALSE, message=FALSE}
+library(readr)
+library(igraph)
+library(igraphdata)
+library(sand)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+# Upload Data
+```{r upload, message=FALSE}
+nodes <- read_csv("jean-complete-node.csv")
+head(nodes)
+summary(nodes)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+edges <- read_csv("jean-complete-edge.csv")
+head(edges)
+summary(edges)
 ```
 
-## Including Plots
+## check for NAs
+```{r check for NA}
+table(is.na(edges))
 
-You can also embed plots, for example:
+which(is.na(edges))
+edges[1097,]
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+dim(edges)
+edges <- na.omit(edges)
+dim(edges)
+
+table(is.na(edges))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+g <- graph_from_data_frame(edges, directed=FALSE)
+
+plot(g, vertex.label=NA)
+```
+
+## initial analysis
+```{r}
+# degree for each node
+hist(degree(g))
+```
+
+```{r}
+hist(graph.strength(g))
+```
+
+```{r capo dei capo}
+s <- graph.strength(g)
+b <- betweenness(g)
+
+plot(s, b)
+```
+```{r}
+ia <- order(b, decreasing=TRUE)
+
+
+V(g)$role[order(s, decreasing=TRUE)]
+```
+
+```{r}
+ia <- order(b, decreasing=T)[1]
+which.max(b)
+
+name <- names(which.max(b))
+
+name_out <- nodes[nodes$Id == name, ][2, 2]
+
+namename <- name_out$Label
+
+cat('the important actor is',namename,'\n')
+```
+
+
+```{r}
+degree_dist <- function(graph) {
+  fd <- table(degree(graph))
+  d <- as.numeric(names(fd)) + 1 
+  list(d = d, fd = fd)
+}
+```
+
+```{r}
+dd <- degree_dist(g)
+
+head(dd$d,20)
+head(dd$fd,20)
+```
+```{r}
+with(dd, plot(log(d), log(fd)))
+```
+
+
+
+
+
+
+
+
