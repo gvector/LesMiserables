@@ -1,6 +1,6 @@
 ---
 title: "LesMiserables - SAND"
-author: "Giacomo Victor Massari"
+author: "Giacomo Victor Massari (5112625) Maria Sofia Pizi (5108658)"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -93,12 +93,29 @@ degree_dist <- function(graph) {
 ```{r}
 dd <- degree_dist(g)
 
-head(dd$d,20)
-head(dd$fd,20)
+dd$d # degrees
+dd$fd # frequency, sum to 180
 ```
 ```{r}
 with(dd, plot(log(d), log(fd)))
 ```
+
+```{r}
+mod0 <- lm(log(fd) ~ log(d), data=dd)
+mod1 <- glm(fd ~ log(d), family = poisson, data=dd)
+cat('model with the fd transformed:', '\n')
+summary(mod0)
+cat('model without the fd transformed:', '\n')
+summary(mod1)
+```
+```{r}
+with(dd, plot(log(d),log(fd)))
+abline(a=mod0$coef[1],b=mod0$coef[2], col='red')
+abline(a=mod1$coef[1],b=mod1$coef[2], col='blue')
+```
+
+
+
 
 
 
