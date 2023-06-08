@@ -1,30 +1,219 @@
 ---
 title: "LesMiserables - SAND"
-author: "Giacomo Victor Massari"
+author: "Giacomo Victor Massari (5112625) Maria Sofia Pizi (5108658)"
 date: "`r Sys.Date()`"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r libraries, warning=FALSE, message=FALSE}
+library(readr)
+library(igraph)
+library(igraphdata)
+library(sand)
+library(visNetwork)
+library(dplyr)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
+# Upload Data
+```{r upload, message=FALSE}
+nodes <- read_csv("jean-complete-node.csv")
+head(nodes)
+summary(nodes)
+
+edges <- read_csv("jean-complete-edge.csv")
+head(edges)
+summary(edges)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+## check for NAs
+```{r check for NA}
+table(is.na(edges))
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+which(is.na(edges))
+edges[1097,]
+
+dim(edges)
+edges <- na.omit(edges)
+dim(edges)
+
+table(is.na(edges))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+# dataframe
+```{r}
+# Create graph for Louvain
+g <- graph_from_data_frame(edges, directed = FALSE)
+```
+
+**modularity**: 
+
+```{r}
+g_t <- simplify(g)
+
+kc <- cluster_fast_greedy(g_t)
+
+length(kc)
+
+plot(kc, g_t)
+```
+
+
+```{r}
+set.seed(123456)
+
+V(g_t)$community <- kc$membership
+
+colors <- adjustcolor(col = c("red", "orange", "yellow", "green", "blue", "#4b0082", "violet"), alpha=1)
+
+plot(kc, g_t, vertex.size=5, , vertex.color=colors[V(g_t)$community], vertex.label=NA, asp=.5)
+```
+
+
+```{r}
+par(cex=.4)
+plot_dendrogram(kc, mode = 'hclust', colbar=c("red", "orange", "yellow", "green", "blue", "#4b0082", "violet"))
+```
+
+```{r}
+kc <- cluster_fast_greedy(g_t)
+plot(kc, g_t)
+```
+
+
+
+## interactive plot
+
+
+```{r}
+nodes <- nodes %>%
+  rename("id" = "Id",
+         "label" = "Label")
+
+edges <- edges %>% 
+        rename("from" = "Source",
+               "to" = "Target")
+
+```
+## hieragichal Clustering
+```{r, warning=FALSE}
+
+# Louvain Comunity Detection
+cluster <- cluster_louvain(g)
+
+cluster_df <- data.frame(as.list(membership(cluster)))
+cluster_df <- as.data.frame(t(cluster_df))
+cluster_df$id <- rownames(cluster_df)
+
+# Create group column
+nodes <- left_join(nodes, cluster_df, by = "id")
+colnames(nodes)[4] <- "group"
+```
+
+```{r message=FALSE, warning=FALSE}
+visNetwork(nodes, edges, width = "100%") %>%
+  visIgraphLayout() %>%
+  visNodes(
+    shape = "dot",
+    color = list(
+      background = "#0085AF",
+      border = "#013848",
+      highlight = "#FF8000"
+    ),
+    shadow = list(enabled = TRUE, size = 10)
+  ) %>%
+  visEdges(
+    shadow = FALSE,
+    color = list(color = "#0085AF", highlight = "#C62F4B")
+  ) %>%
+  visOptions(highlightNearest = list(enabled = T, degree = 1, hover = T),
+             selectedBy = "group") %>% 
+  visLayout(randomSeed = 11)
+```
+
+
+NB: louvain cluster: It is based on the modularity measure and a hierarchical approach. Initially, each vertex is assigned to a community on its own. In every step, vertices are re-assigned to communities in a local, greedy way: *each vertex is moved to the community with which it achieves the highest contribution to modularity.* When no vertices can be reassigned, each community is considered a vertex on its own, and the process starts again with the merged communities. The process stops when there is only a single vertex left or when the modularity cannot be increased any more in a step. Since igraph 1.3, vertices are processed in a random order.
+
+
+## initial analysis
+```{r}
+# degree for each node
+hist(degree(g))
+```
+
+```{r}
+hist(graph.strength(g))
+```
+
+```{r capo dei capo}
+s <- graph.strength(g)
+b <- betweenness(g)
+
+plot(s, b)
+```
+```{r}
+ia <- order(b, decreasing=TRUE)
+
+
+V(g)$role[order(s, decreasing=TRUE)]
+```
+
+```{r}
+ia <- order(b, decreasing=T)[1]
+which.max(b)
+
+name <- names(which.max(b))
+
+name_out <- nodes[nodes$Id == name, ][2, 2]
+
+namename <- name_out$Label
+
+cat('the important actor is',namename,'\n')
+```
+
+
+```{r}
+degree_dist <- function(graph) {
+  fd <- table(degree(graph))
+  d <- as.numeric(names(fd)) + 1 
+  list(d = d, fd = fd)
+}
+```
+
+```{r}
+dd <- degree_dist(g)
+
+dd$d # degrees
+dd$fd # frequency, sum to 180
+```
+```{r}
+with(dd, plot(log(d), log(fd)))
+```
+
+```{r}
+mod0 <- lm(log(fd) ~ log(d), data=dd)
+mod1 <- glm(fd ~ log(d), family = poisson, data=dd)
+cat('model with the fd transformed:', '\n')
+summary(mod0)
+cat('model without the fd transformed:', '\n')
+summary(mod1)
+```
+```{r}
+with(dd, plot(log(d),log(fd)))
+abline(a=mod0$coef[1],b=mod0$coef[2], col='red')
+abline(a=mod1$coef[1],b=mod1$coef[2], col='blue')
+```
+
+
+
+
+
+
+
+
+
+
