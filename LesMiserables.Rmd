@@ -234,13 +234,15 @@ visNetwork(nodes, edges, width = "100%") %>%
 
 NB: louvain cluster: It is based on the modularity measure and a hierarchical approach. Initially, each vertex is assigned to a community on its own. In every step, vertices are re-assigned to communities in a local, greedy way: *each vertex is moved to the community with which it achieves the highest contribution to modularity.* When no vertices can be reassigned, each community is considered a vertex on its own, and the process starts again with the merged communities. The process stops when there is only a single vertex left or when the modularity cannot be increased any more in a step. Since igraph 1.3, vertices are processed in a random order.
 
-## Clustering lab 4
+## Clustering slides
+
 ```{r, chache= TRUE}
+# dalle slides
 library(sbm)
-library(ggplot2)
-g_s <- upgrade_graph(g_s)
-party.nums <- V(g_am)$id %>% as.factor() %>% as.numeric()
-sm <- get.adjacency(g_am, sparse = FALSE) %>%
+g_sbm <- simplify(g)
+g_sbm <- upgrade_graph(g_sbm)
+party.nums <- V(g_sbm) %>% as.factor() %>% as.numeric()
+sm <- get.adjacency(g_sbm, sparse = FALSE) %>%
   estimateSimpleSBM(estimOptions = list(plot=FALSE, verbosity=0))
 
 tibble(pp=factor(party.nums), sbm= factor(sm$memberships)) %>% count(pp, sbm) %>% 
