@@ -10,7 +10,11 @@ library(readr)
 library(igraph)
 library(igraphdata)
 library(sand)
+library(visNetwork)
+library(dplyr)
 ```
+
+
 
 
 # Upload Data
@@ -23,6 +27,7 @@ edges <- read_csv("jean-complete-edge.csv")
 head(edges)
 summary(edges)
 ```
+
 
 ## check for NAs
 ```{r check for NA}
@@ -37,6 +42,58 @@ dim(edges)
 
 table(is.na(edges))
 ```
+
+## dataframe
+```{r}
+nodes <- nodes %>%
+  rename("id" = "Id",
+         "label" = "Label")
+
+edges <- edges %>% 
+        rename("from" = "Source",
+               "to" = "Target")
+
+visNetwork(nodes=nodes, edges=edges)
+```
+
+```{r, warning=FALSE}
+#Create graph for Louvain
+g <- graph_from_data_frame(edges, directed = FALSE)
+
+#Louvain Comunity Detection
+cluster <- cluster_louvain(g)
+
+cluster_df <- data.frame(as.list(membership(cluster)))
+cluster_df <- as.data.frame(t(cluster_df))
+cluster_df$id <- rownames(cluster_df)
+
+#Create group column
+nodes <- left_join(nodes, cluster_df, by = "id")
+colnames(nodes)[4] <- "group"
+```
+
+## interactive plot
+```{r, message=FALSE}
+visNetwork(nodes, edges, width = "100%") %>%
+  visIgraphLayout() %>%
+  visNodes(
+    shape = "dot",
+    color = list(
+      background = "#0085AF",
+      border = "#013848",
+      highlight = "#FF8000"
+    ),
+    shadow = list(enabled = TRUE, size = 10)
+  ) %>%
+  visEdges(
+    shadow = FALSE,
+    color = list(color = "#0085AF", highlight = "#C62F4B")
+  ) %>%
+  visOptions(highlightNearest = list(enabled = T, degree = 1, hover = T),
+             selectedBy = "group") %>% 
+  visLayout(randomSeed = 11)
+```
+
 
 
 ```{r}
