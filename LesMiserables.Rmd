@@ -12,6 +12,7 @@ library(igraphdata)
 library(sand)
 library(visNetwork)
 library(dplyr)
+library(tidyverse)
 ```
 
 
@@ -55,6 +56,54 @@ edges <- edges %>%
 
 # visNetwork(nodes=nodes, edges=edges)
 ```
+
+```{r}
+# Group the dataframe by the "From" and "To" columns and count the number of unique IDs
+multiple_edges <- edges %>%
+  group_by(from, to) %>%
+  summarize(n = n()) %>%
+  group_by(from, to) %>%
+  filter(n > 1)
+
+# View the elements with multiple values for both "From" and "To"
+print(multiple_edges)
+
+```
+
+```{r}
+merged_edges <- edges %>%
+  left_join(multiple_edges, by = c("from", "to")) %>%
+  mutate(n = ifelse(is.na(n), 1, n)) %>%
+  distinct(from, to, .keep_all=TRUE)
+
+# View the merged dataframe
+print(merged_edges)
+```
+
+
+```{r}
+g_w <- graph_from_data_frame(merged_edges, directed=FALSE)
+
+# Set the weights of the edges based on the 'n' column
+E(g_w)$weight <- merged_edges$n
+
+layout_gw <- layout_with_fr(g_w)
+
+# View the graph summary
+plot.igraph(g_w, layout=layout_gw, vertex.label=NA, vertex.size=5, edge.width=E(g_w)$weight)
+```
+
+```{r}
+vis <- toVisNetworkData(g_w)
+
+visNetwork(
+  nodes = vis$nodes,
+  edges = vis$edges,
+  width = '100%',
+  height = '600px'
+)
+```
+
 
 
 # dataframe
@@ -245,7 +294,80 @@ plot.igraph(component_list[[1]])
 ```
 
 
+## snowball
 
+```{r}
+snowball_p <- function (g, seeds, waves = 1, p = 1,
+                        return_subgraph = TRUE) {
+  n <- vcount(g)
+  marked <- rep(-1L, n) # all unmarked
+  marked[seeds] <- 0 # mark seed set
+  sel_edges <- logical(ecount(g)) # no edges selected
+  for (w in seq_len(waves)) {
+    for (v in which(marked >= 0)) { # sample
+      Ev <- incident(g, v); nnv <- length(Ev)
+      if (nnv > 0) {
+        s <- rbinom(nnv, 1, p) == 1
+        if (any(s)) {
+          se <- Ev[s]
+          sel_edges[se] <- TRUE
+          sv <- V(g)[.inc(se)]; sv <- sv[marked[sv] < 0]
+          marked[sv] <- w # tag wave
+        }
+      }
+    }
+    if (all(marked >= 0)) break
+  }
+  if (return_subgraph)
+    subgraph.edges(g, E(g)[sel_edges])
+  else
+    list(edges = sel_edges, waves = split(seq_along(marked), marked)[-1])
+}
+```
+
+```{r}
+snowball_m <- function (g, seeds, waves = 1, m = 1,
+                        return_subgraph = TRUE) {
+  n <- vcount(g)
+  marked <- rep(-1L, n) # all unmarked
+  marked[seeds] <- 0 # mark seed set
+  sel_edges <- logical(ecount(g)) # no edges selected
+  for (w in seq_len(waves)) {
+    for (v in which(marked >= 0)) { # sample
+      Ev <- incident(g, v); nnv <- length(Ev)
+      if (nnv > 0) {
+        se <- if (nnv <= m) Ev else sample(Ev, m)
+        sel_edges[se] <- TRUE
+        sv <- V(g)[.inc(se)]; sv <- sv[marked[sv] < 0]
+        marked[sv] <- w # tag wave
+      }
+    }
+    if (all(marked >= 0)) break
+  }
+  if (return_subgraph)
+    subgraph.edges(g, E(g)[sel_edges])
+  else
+    list(edges = sel_edges, waves = split(seq_along(marked), marked)[-1])
+}
+```
+
+```{r}
+nseeds <- 3; S <- sample(V(g), nseeds)
+
+g_snow2 <- snowball_m(g, seeds=S, m=5)
+
+length(g_snow2)
+plot(g_snow2)
+```
+
+
+```{r}
+g_snow1 <- snowball_p(g, p=.1, seeds=S)
+
+length(g_snow1)
+
+plot(g_snow1)
+```
 
 
 
