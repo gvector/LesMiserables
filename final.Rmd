@@ -14,10 +14,25 @@ library(visNetwork)
 ```
 
 # Data
+The data is about characters in Victor Hugo's book Les Miserables and it is taken from GitHub ([https://github.com/MADStudioNU/lesmiserables-character-network/tree/master](URL)). The data is composed by two files which will name "nodes" and "edges". 
+
 ```{r upload, message=FALSE}
 nodes <- read_csv("jean-complete-node.csv")
+head(nodes)
 edges <- read_csv("jean-complete-edge.csv")
+head(edges)
 ```
+From the above chunk we see that the dataset nodes has 181 nodes with 3 columns:
+- Id: the id of the character 
+- Label: the full name of the character 
+- Description: details on the character 
+
+While the dataset edges has 1589 and 5 columns:
+- Source: 
+- Target
+- Type: it's undirected for every character
+- Id
+- Label: the chapter in which the character appeared 
 
 For simplicity reasons, we will rename the columns "Source" and "Target" of the dataset into "from" and "to" respectively. 
 ```{r}
@@ -31,7 +46,8 @@ edges <- edges %>%
 
 ```
 
-## Check NAs and in case remove 
+## Check NAs
+Before starting the analysis we need to check for Nas and in case remove them. 
 ```{r check for NA}
 table(is.na(edges))
 
@@ -44,7 +60,8 @@ table(is.na(edges))
 
 ## Check for duplicate interactions in the dataset
 
-We group the dataframe "edges" by "from" and "to" columns and count the number of unique IDs.
+We now check if there are duplicate interactions between characters.
+To do so we create a new dataframe from the already existing dataframe "edges" and group by the columns "from" and "to"; then we count the number of unique IDs.
 ```{r message=FALSE, warning=FALSE}
 multiple_edges <- edges %>%
   group_by(from, to) %>%
@@ -55,6 +72,7 @@ multiple_edges <- edges %>%
 multiple_edges
 ```
 ## merge with edges
+We now merge the dataframes "edges" and "multiple_edges" in order to include the count of interactions between characters, making sure to take the distinct count of each interaction. 
 ```{r}
 merged_edges <- edges %>%
   left_join(multiple_edges, by = c("from", "to")) %>%
@@ -63,10 +81,10 @@ merged_edges <- edges %>%
 
 merged_edges
 ```
+The above dataframe is the one we'll use for our analysis. 
 
-# Transform the dataframe into graph
-
-For visualization purposes we'll transform into graph both the edge dataframe (which contains multiedges) and the merged_edges dataframe which at this point will be a weighted graph. 
+# Transform the dataframe into graphs
+For visualization purposes we'll transform into graph both the "edges" dataframe (which contains duplicate interactions), but this will not be then used for following analyis. Moreover we'll transofrm into a weighted graph the "merged_edges" dataframe. The weights of each edge will be based on the number of interactions between the characters. 
 
 ```{r}
 # graph with duplicate interactions
@@ -80,27 +98,30 @@ E(g_w)$weight <- merged_edges$n
 ```
 
 ```{r}
-hist(E(g_w)$weight)
+hist(E(g_w)$weight, breaks = 25,
+     xlab= "Weights", main="Edges' weight distribution")
 ```
 
 ## Plots of graphs
+The following is the plot of the multiedged graph:
 ```{r, cache=TRUE}
 vis_g <- toVisNetworkData(g)
 
 visNetwork(
-  nodes = vis$nodes,
-  edges = vis$edges,
+  nodes = vis_g$nodes,
+  edges = vis_g$edges,
   width = "100%",
   height = '600px'
 )
 ```
 
+The following is the single-edges, but weighted graph:
 ```{r, cache=TRUE}
 vis_g_w <- toVisNetworkData(g_w)
 
 visNetwork(
-  nodes = vis$nodes,
-  edges = vis$edges,
+  nodes = vis_g_w$nodes,
+  edges = vis_g_w$edges,
   width = "100%",
   height = '600px'
 )
@@ -108,28 +129,39 @@ visNetwork(
 
 # Analysis 
 
+We now proceed with our analysis looking at degree distribution, betweeness, strength and transitivity. 
 ## Degree table and histogram
 ```{r}
-# degree for each node
+# degree of each vertex
 table(degree(g_w))
-hist(degree(g_w), breaks = 50, ylim = c(0,110))
+hist(degree(g_w), breaks = 50, ylim = c(0,110), 
+     xlab= "Degree",main = "Histogram of degree")
 ```
+The code degree(g_w) calculates the degree of each vertex in the graph, more in details the degree of a vertex in a graph represents the number of edges connected to that vertex.
+From the above chunk we see that the highest degree is 87, while there are most of the edges that have degree from 1 to 7. 
 
 ## Strength
 ```{r}
 s <- graph.strength(g_w)
 hist(s,breaks = 30, ylim = c(0,130))
 ```
+The code graph.strength(g_w) calculates the strength of each vertex in the graph, more in details the strength of a vertex in a graph is a measure of the sum of weights of the edges connected to that vertex. Hence, this measure is particularly useful when working with weighted graphs, which is the case of out graph where , as a remark, the weights of the edges are given by the count of the interactions between characters. 
+
 ## Betweeness
 ```{r}
 b <- betweenness(g_w)
 hist(b,breaks = 30)
 ```
+The code betweenness(g_w) calculates the betweenness centrality of each vertex in the graph, more in details betweenness centrality is a measure of how central or influential a vertex is in a graph based on the concept of shortest paths. In general, vertices with higher betweenness are considered more central in the network as they tend to lie on a higher number of shortest paths between other pairs of vertices.
 
 ## Betweeness and Strength
 ```{r}
 plot(s, b)
 ```
+The above scatter plot shows the relationship between the vertex strengths and their betweenness centrality in the graph. Each point on the plot represents a vertex, and its position corresponds to the strength and betweenness centrality values of that vertex.
+In general, vertices with higher strength values tend to have higher or lower betweenness centrality, indicating whether more influential vertices also tend to have stronger connections in the graph. 
+In this case, we see that there is a particular observation having high strength and high betweeness, suggesting that that particular point might be an important character. 
+Hence, we now investigate on who are the important actors in our network. 
 
 ## Important actor
 ```{r}
@@ -145,6 +177,7 @@ cat('The important actor is',namename,'\n')
 ```
 
 ## Degree distribution
+We now look at the degree distribution:
 ```{r}
 degree_dist <- function(graph) {
   fd <- table(degree(graph))
@@ -159,6 +192,9 @@ dd$fd # frequency, sum to 180
 # Plot
 with(dd, plot(log(d), log(fd)))
 ```
+The degree_dist function calculates the degree distribution of the graph, which means it computes the frequency distribution of the degrees (number of edges incident to each vertex) in the graph and it then returns a list with two elements: the degree values and their corresponding frequency counts.
+We then plot and visualize the degree distribution in logarithmic scales, more specifically to check if the degree distribution follows a power-law pattern.
+In this case *??????????*
 
 # Models
 
@@ -192,14 +228,17 @@ ergm(g_ergm~edges) %>% summary
 ```
 
 # Clustering
+We now perform some clustering analysis using different methods such as fast greedy algorithm, edge betweenness clustering algorithm, and Louvain community detection algorithm. Furthermore, we'll also look at the modularity scores which quantifies the quality of the community structure within the network. 
 
 ## Cluster by greedy optimization of modularity
 
-To not overwrite the initial graph g_w I create a new one
 ```{r}
 g_kc <- graph_from_data_frame(merged_edges, directed=FALSE)
 kc <- cluster_fast_greedy(g_kc)
 ```
+
+In general, cluster_fast_greedy() function partitions the graph into communities based on the connectivity patterns between vertices and it aims to find a division of the graph that maximizes the modularity score. The resulting communities represent groups of vertices that are more densely connected within their own group compared to connections between different groups.
+
 ```{r}
 l_kc <- length(kc)
 cat('The number of clusters by greedy optimization of modularity are',l_kc,'\n')
@@ -210,7 +249,7 @@ cat('The modularity coefficient is',mod_kc,'\n')
 table(membership(kc))
 ```
 
-
+We now plot the  clustering method based on the fast greedy algorithm:
 ```{r}
 set.seed(123456)
 
@@ -233,6 +272,8 @@ g_ceb <- graph_from_data_frame(merged_edges, directed=FALSE)
 ceb <- cluster_edge_betweenness(g_ceb) 
 ```
 
+In general, the edge betweenness algorithm works by iteratively removing edges with the highest betweenness centrality and as edges are removed, the graph is divided into communities based on the remaining connected components. This process continues until all edges are removed, resulting in a hierarchical structure of communities.
+
 ```{r}
 l_ceb <- length(ceb)
 cat('The number of clusters by greedy optimization of modularity are',l_ceb,'\n')
@@ -243,7 +284,7 @@ cat('The modularity coefficient is',mod_ceb,'\n')
 ```{r}
 table(membership(ceb))
 ```
-
+We now plot the clustering method based on edge betweenness algorithm:
 ```{r}
 # Plotting the histogram
 hist(membership(ceb), breaks = 30)
@@ -277,10 +318,14 @@ nodes <- left_join(nodes, cluster_df, by = "id")
 colnames(nodes)[4] <- "group"
 ```
 
+In general, the Louvain algorithm is a widely used and efficient method for community detection in networks. It optimizes the modularity of the network by iteratively moving vertices between communities to increase the modularity score. The algorithm starts with each vertex in its own community and iteratively merges communities to maximize modularity.
+
 ```{r}
 mod_hc <- modularity(cluster)
 cat('The modularity coefficient is',mod_hc,'\n')
 ```
+
+We now plot the clustering method based on the Louvain algorithm:
 ```{r}
 plot(cluster, g_hc, vertex.size=5, vertex.label=NA, asp=.5)
 ```
@@ -309,9 +354,6 @@ visNetwork(nodes, merged_edges, width = "100%") %>%
              selectedBy = "group") %>% 
   visLayout(randomSeed = 11)
 ```
-
-
-NB: louvain cluster: It is based on the modularity measure and a hierarchical approach. Initially, each vertex is assigned to a community on its own. In every step, vertices are re-assigned to communities in a local, greedy way: *each vertex is moved to the community with which it achieves the highest contribution to modularity.* When no vertices can be reassigned, each community is considered a vertex on its own, and the process starts again with the merged communities. The process stops when there is only a single vertex left or when the modularity cannot be increased any more in a step. Since igraph 1.3, vertices are processed in a random order.
 
 # Subgraphing by Chapter
 ```{r}
