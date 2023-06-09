@@ -53,7 +53,7 @@ edges <- edges %>%
         rename("from" = "Source",
                "to" = "Target")
 
-visNetwork(nodes=nodes, edges=edges)
+# visNetwork(nodes=nodes, edges=edges)
 ```
 
 
@@ -123,7 +123,7 @@ image(as.matrix(g[, seq(vcount(g), 1)]), col = grey.colors(2, 1, 0))
 
 
 ## interactive plot
-```{r, message=FALSE}
+```{r, message=FALSE, warning=FALSE}
 visNetwork(nodes, edges, width = "100%") %>%
   visIgraphLayout() %>%
   visNodes(
@@ -158,11 +158,15 @@ plot(g, vertex.label=NA)
 ## initial analysis
 ```{r}
 # degree for each node
-hist(degree(g))
+hist(degree(g), breaks = 75, col = hcl.colors(length(degree(g)), rev = F,palette = "reds"))
+abline(v=mean(degree(g)), col='red', lwd=3)
+abline(v=median(degree(g)), col='blue', lwd=3)
 ```
 
 ```{r}
-hist(graph.strength(g))
+hist(betweenness(g), breaks = 50)
+abline(v=mean(betweenness(g)), col='red', lwd=3)
+abline(v=median(betweenness(g)), col="blue", lwd=2)
 ```
 
 ```{r capo dei capo}
@@ -171,6 +175,7 @@ b <- betweenness(g)
 
 plot(s, b)
 ```
+
 ```{r}
 ia <- order(b, decreasing=TRUE)
 
@@ -207,7 +212,7 @@ dd$d # degrees
 dd$fd # frequency, sum to 180
 ```
 ```{r}
-with(dd, plot(log(d), log(fd)))
+with(dd, plot(log(d), log(fd)),col = hcl.colors(length(degree(g)), rev = F,palette = "greens"))
 ```
 
 ```{r}
@@ -227,6 +232,17 @@ abline(a=mod1$coef[1],b=mod1$coef[2], col='blue')
 
 
 
+```{r}
+deco_g <- decompose(g, mode='weak')
+
+deco_g[1]
+
+plot.igraph(deco_g)
+```
+```{r}
+component_list = decompose.graph(g, mode = "weak")
+plot.igraph(component_list[[1]])
+```
 
 
 
