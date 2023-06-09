@@ -38,12 +38,62 @@ dim(edges)
 table(is.na(edges))
 ```
 
+## Check for multiple edges in the dataset
+```{r}
+library(tidyverse)
+# Group the dataframe by the "From" and "To" columns and count the number of unique IDs
+multiple_edges <- edges %>%
+  group_by(Source, Target) %>%
+  summarize(n = n()) %>%
+  group_by(Source, Target) %>%
+  filter(n > 1)
+
+# View the elements with multiple values for both "From" and "To"
+print(multiple_edges)
+```
+
+## merge with edges
+```{r}
+merged_edges <- edges %>%
+  left_join(multiple_edges, by = c("Source", "Target")) %>%
+  mutate(n = ifelse(is.na(n), 1, n)) %>%
+  distinct(Source, Target, .keep_all = TRUE)
+
+merged_edges
+```
+
+```{r}
+# create the weighted graph
+g_w <- graph_from_data_frame(merged_edges, directed=FALSE)
+
+# Set the weights of the edges based on the 'n' column
+E(g_w)$weight <- merged_edges$n
+
+layout_gw <- layout_with_fr(g_w)
+```
+
+```{r}
+library(visNetwork)
+
+vis <- toVisNetworkData(g_w)
+
+visNetwork(
+  nodes = vis$nodes,
+  edges = vis$edges,
+  width = "100%",
+  height = '600px'
+)
+```
+
 
 # dataframe
 ```{r}
 # Create graph
 g <- graph_from_data_frame(edges, directed = FALSE)
+plot(g, edge.curved = 0.3)
+```
 
+```{r}
 # Create simple graph
 g_s <- simplify(g)
 ```
