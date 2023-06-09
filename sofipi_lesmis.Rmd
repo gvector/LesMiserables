@@ -1,0 +1,325 @@
+---
+title: "LesMiserables - SAND"
+author: "Giacomo Victor Massari (5112625) Maria Sofia Pizi (5108658)"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r libraries, warning=FALSE, message=FALSE}
+library(readr)
+library(igraph)
+library(igraphdata)
+library(sand)
+library(visNetwork)
+library(dplyr)
+```
+
+
+# Upload Data
+```{r upload, message=FALSE}
+nodes <- read_csv("jean-complete-node.csv")
+
+edges <- read_csv("jean-complete-edge.csv")
+
+```
+
+
+## check for NAs
+```{r check for NA}
+table(is.na(edges))
+
+which(is.na(edges))
+edges[1097,]
+
+dim(edges)
+edges <- na.omit(edges)
+dim(edges)
+
+table(is.na(edges))
+```
+
+## Check for multiple edges in the dataset
+```{r}
+library(tidyverse)
+# Group the dataframe by the "From" and "To" columns and count the number of unique IDs
+multiple_edges <- edges %>%
+  group_by(Source, Target) %>%
+  summarize(n = n()) %>%
+  group_by(Source, Target) %>%
+  filter(n > 1)
+
+# View the elements with multiple values for both "From" and "To"
+print(multiple_edges)
+```
+
+DESCRIPTION ABOVE CODE
+The code groups the edges dataframe by the "from" and "to" columns using the group_by() function.
+It then calculates the count of unique occurrences for each combination of "from" and "to" using the summarize() function and assigns the result to the column n.
+Next, it groups the resulting dataframe again by the "from" and "to" columns.
+Finally, it filters the grouped dataframe to keep only the rows where the count n is greater than 1, indicating multiple interactions between the same "from" and "to" nodes. The filtered result is stored in the multiple_edges dataframe, which shows the combinations with multiple interactions.
+
+## merge with edges
+```{r}
+merged_edges <- edges %>%
+  left_join(multiple_edges, by = c("Source", "Target")) %>%
+  mutate(n = ifelse(is.na(n), 1, n)) %>%
+  distinct(Source, Target, .keep_all = TRUE)
+
+merged_edges
+```
+
+DESCRIPTION ABOVE CODE 
+The code performs a left join between the edges dataframe and the multiple_edges dataframe using the "from" and "to" columns as the join keys.
+It then adds a new column n to the resulting dataframe, where missing values (NA) are replaced with 1 using the ifelse() function.
+Next, it removes duplicate rows from the dataframe based on the "from" and "to" columns using the distinct() function, while keeping all other columns (.) as specified by .keep_all = TRUE.
+The resulting dataframe, merged_edges, contains a single representative interaction per unique combination of "from" and "to" nodes, where the n column represents the count of multiple interactions (or 1 if there were no duplicates).
+
+
+```{r}
+# create the weighted graph
+g_w <- graph_from_data_frame(merged_edges, directed=FALSE)
+
+# Set the weights of the edges based on the 'n' column
+E(g_w)$weight <- merged_edges$n
+
+layout_gw <- layout_with_fr(g_w)
+```
+
+```{r}
+library(visNetwork)
+
+vis <- toVisNetworkData(g_w)
+
+visNetwork(
+  nodes = vis$nodes,
+  edges = vis$edges,
+  width = "100%",
+  height = '600px'
+)
+```
+
+
+# dataframe
+```{r}
+# Create graph
+g <- graph_from_data_frame(edges, directed = FALSE)
+plot(g, edge.curved = 0.3)
+```
+
+```{r}
+# Create simple graph
+g_s <- simplify(g)
+```
+
+
+## initial analysis
+```{r}
+# degree for each node
+hist(degree(g))
+```
+
+```{r}
+hist(graph.strength(g))
+```
+
+```{r capo dei capo}
+s <- graph.strength(g)
+b <- betweenness(g)
+
+plot(s, b)
+```
+```{r}
+ia <- order(b, decreasing=TRUE)
+
+
+V(g)$role[order(s, decreasing=TRUE)]
+```
+
+```{r}
+ia <- order(b, decreasing=T)[1]
+which.max(b)
+
+name <- names(which.max(b))
+
+name_out <- nodes[nodes$Id == name, ][2, 2]
+
+namename <- name_out$Label
+
+cat('the important actor is',namename,'\n')
+```
+
+
+```{r}
+degree_dist <- function(graph) {
+  fd <- table(degree(graph))
+  d <- as.numeric(names(fd)) + 1 
+  list(d = d, fd = fd)
+}
+```
+
+```{r}
+dd <- degree_dist(g)
+
+dd$d # degrees
+dd$fd # frequency, sum to 180
+```
+```{r}
+with(dd, plot(log(d), log(fd)))
+```
+
+```{r}
+mod0 <- lm(log(fd) ~ log(d), data=dd)
+mod1 <- glm(fd ~ log(d), family = poisson, data=dd)
+cat('model with the fd transformed:', '\n')
+summary(mod0)
+cat('model without the fd transformed:', '\n')
+summary(mod1)
+```
+```{r}
+with(dd, plot(log(d),log(fd)))
+abline(a=mod0$coef[1],b=mod0$coef[2], col='red')
+abline(a=mod1$coef[1],b=mod1$coef[2], col='blue')
+```
+
+## ERGM model
+```{r message=FALSE, warning=FALSE}
+library(ergm)
+am <- get.adjacency(g_s, sparse = FALSE)
+g_s <-as.network(am, directed = FALSE)
+ergm(g_s~edges) %>% summary
+```
+
+
+**modularity**: 
+## Community detection based on greedy optimization of modularity
+```{r}
+g_kc <- simplify(g) # remove all multiple edges
+
+kc <- cluster_fast_greedy(g_kc)
+
+length(kc)
+```
+
+
+```{r}
+set.seed(123456)
+
+V(g_kc)$community <- kc$membership
+
+colors <- adjustcolor(col = c("red", "orange", "yellow", "green", "blue", "#4b0082", "violet"), alpha=1)
+
+plot(kc, g_kc, vertex.size=5, , vertex.color=colors[V(g_kc)$community], vertex.label=NA, asp=.5)
+```
+
+```{r}
+# dendrogram based on kc
+par(cex=.4)
+plot_dendrogram(kc, mode = 'hclust', colbar=c("red", "orange", "yellow", "green", "blue", "#4b0082", "violet"))
+```
+
+
+## Community detection based on edge betweenness (Newman-Girvan)
+```{r}
+g_ceb <- simplify(g) 
+ceb <- cluster_edge_betweenness(g_ceb) 
+length(ceb) # number of communities
+table(membership(ceb)) # community membership for each node
+modularity(ceb) # how modular the graph partitioning is
+```
+
+```{r}
+# Plotting the histogram
+hist(membership(ceb))
+```
+```{r}
+set.seed(1)
+
+V(g_ceb)$community <- ceb$membership
+
+plot(ceb, g_ceb, vertex.size=5, vertex.label=NA, asp=.5)
+```
+
+
+```{r}
+dendPlot(ceb, mode="hclust", cex= .4)
+```
+
+## hieragichal Clustering
+
+```{r}
+nodes <- nodes %>%
+  rename("id" = "Id",
+         "label" = "Label")
+
+edges <- edges %>% 
+        rename("from" = "Source",
+               "to" = "Target")
+
+```
+
+
+```{r, warning=FALSE}
+
+# Louvain Comunity Detection
+cluster <- cluster_louvain(g)
+
+cluster_df <- data.frame(as.list(membership(cluster)))
+cluster_df <- as.data.frame(t(cluster_df))
+cluster_df$id <- rownames(cluster_df)
+
+# Create group column
+nodes <- left_join(nodes, cluster_df, by = "id")
+colnames(nodes)[4] <- "group"
+```
+
+## interaction plot
+```{r message=FALSE, warning=FALSE}
+visNetwork(nodes, edges, width = "100%") %>%
+  visIgraphLayout() %>%
+  visNodes(
+    shape = "dot",
+    color = list(
+      background = "#0085AF",
+      border = "#013848",
+      highlight = "#FF8000"
+    ),
+    shadow = list(enabled = TRUE, size = 10)
+  ) %>%
+  visEdges(
+    shadow = FALSE,
+    color = list(color = "#0085AF", highlight = "#C62F4B")
+  ) %>%
+  visOptions(highlightNearest = list(enabled = T, degree = 1, hover = T),
+             selectedBy = "group") %>% 
+  visLayout(randomSeed = 11)
+```
+
+
+NB: louvain cluster: It is based on the modularity measure and a hierarchical approach. Initially, each vertex is assigned to a community on its own. In every step, vertices are re-assigned to communities in a local, greedy way: *each vertex is moved to the community with which it achieves the highest contribution to modularity.* When no vertices can be reassigned, each community is considered a vertex on its own, and the process starts again with the merged communities. The process stops when there is only a single vertex left or when the modularity cannot be increased any more in a step. Since igraph 1.3, vertices are processed in a random order.
+
+## Clustering slides
+
+```{r, chache= TRUE}
+# dalle slides
+library(sbm)
+g_sbm <- simplify(g)
+g_sbm <- upgrade_graph(g_sbm)
+party.nums <- V(g_sbm) %>% as.factor() %>% as.numeric()
+sm <- get.adjacency(g_sbm, sparse = FALSE) %>%
+  estimateSimpleSBM(estimOptions = list(plot=FALSE, verbosity=0))
+
+tibble(pp=factor(party.nums), sbm= factor(sm$memberships)) %>% count(pp, sbm) %>% 
+  ggplot() + geom_tile(aes(pp, sbm, fill= n)) + theme_bw()
+  
+
+gm <- sbm::estimateSimpleSBM(am, model="poisson")
+```
+
+
+
+
+
+
+
+
+
