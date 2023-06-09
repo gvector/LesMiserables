@@ -10,6 +10,7 @@ output: html_document
 # Load libraries
 library(readr)
 library(tidyverse)
+library(visNetwork)
 ```
 
 # Data
@@ -78,11 +79,13 @@ g_w <- graph_from_data_frame(merged_edges, directed=FALSE)
 E(g_w)$weight <- merged_edges$n
 ```
 
-## Plots of graphs
 ```{r}
-library(visNetwork)
+hist(E(g_w)$weight)
+```
 
-vis <- toVisNetworkData(g)
+## Plots of graphs
+```{r, cache=TRUE}
+vis_g <- toVisNetworkData(g)
 
 visNetwork(
   nodes = vis$nodes,
@@ -92,10 +95,8 @@ visNetwork(
 )
 ```
 
-```{r}
-library(visNetwork)
-
-vis <- toVisNetworkData(g_w)
+```{r, cache=TRUE}
+vis_g_w <- toVisNetworkData(g_w)
 
 visNetwork(
   nodes = vis$nodes,
@@ -106,27 +107,33 @@ visNetwork(
 ```
 
 # Analysis 
+
+## Degree table and histogram
 ```{r}
 # degree for each node
 table(degree(g_w))
 hist(degree(g_w), breaks = 50, ylim = c(0,110))
 ```
 
+## Strength
 ```{r}
-hist(graph.strength(g_w),breaks = 30, ylim = c(0,130))
+s <- graph.strength(g_w)
+hist(s,breaks = 30, ylim = c(0,130))
+```
+## Betweeness
+```{r}
+b <- betweenness(g_w)
+hist(b,breaks = 30)
 ```
 
-```{r capo dei capo}
-s <- graph.strength(g_w)
-b <- betweenness(g_w)
-
+## Betweeness and Strength
+```{r}
 plot(s, b)
 ```
 
 ## Important actor
 ```{r}
 ia <- order(b, decreasing=T)[1]
-which.max(b)
 
 name <- names(which.max(b))
 
@@ -134,13 +141,194 @@ name_out <- nodes[nodes$id == name, ][2, 2]
 
 namename <- name_out$label
 
-cat('the important actor is',namename,'\n')
+cat('The important actor is',namename,'\n')
+```
+
+## Degree distribution
+```{r}
+degree_dist <- function(graph) {
+  fd <- table(degree(graph))
+  d <- as.numeric(names(fd)) + 1 
+  list(d = d, fd = fd)
+}
+
+dd <- degree_dist(g_w)
+
+dd$fd # frequency, sum to 180
+
+# Plot
+with(dd, plot(log(d), log(fd)))
+```
+
+# Models
+
+## Linear Model
+```{r}
+mod0 <- lm(log(fd) ~ log(d), data=dd)
+cat('model with the fd transformed:', '\n')
+summary(mod0)
+```
+
+## Generalized Linear Model
+```{r}
+mod1 <- glm(fd ~ log(d), family = poisson, data=dd)
+cat('model without the fd transformed:', '\n')
+summary(mod1)
+```
+
+### Plot
+```{r}
+with(dd, plot(log(d),log(fd)))
+abline(a=mod0$coef[1],b=mod0$coef[2], col='red')
+abline(a=mod1$coef[1],b=mod1$coef[2], col='blue')
+```
+
+## ERGM model
+```{r message=FALSE, warning=FALSE}
+library(ergm)
+am <- get.adjacency(g_w, sparse = FALSE)
+g_ergm <-as.network(am, directed = FALSE)
+ergm(g_ergm~edges) %>% summary
+```
+
+# Clustering
+
+## Cluster by greedy optimization of modularity
+
+To not overwrite the initial graph g_w I create a new one
+```{r}
+g_kc <- graph_from_data_frame(merged_edges, directed=FALSE)
+kc <- cluster_fast_greedy(g_kc)
+```
+```{r}
+l_kc <- length(kc)
+cat('The number of clusters by greedy optimization of modularity are',l_kc,'\n')
+mod_kc <- modularity(kc)
+cat('The modularity coefficient is',mod_kc,'\n')
+```
+```{r}
+table(membership(kc))
 ```
 
 
+```{r}
+set.seed(123456)
+
+V(g_kc)$community <- kc$membership
+
+colors <- adjustcolor(col = c("red", "orange", "yellow", "green", "blue", "#4b0082", "violet"), alpha=1)
+
+plot(kc, g_kc, vertex.size=5, , vertex.color=colors[V(g_kc)$community], vertex.label=NA, asp=.5)
+```
+
+```{r}
+# dendrogram based on kc
+par(cex=.4)
+plot_dendrogram(kc, mode = 'hclust', colbar=c("red", "orange", "yellow", "green", "blue", "#4b0082", "violet"))
+```
+
+## Cluster by Edge betweenness (Newman-Girvan)
+```{r}
+g_ceb <- graph_from_data_frame(merged_edges, directed=FALSE)
+ceb <- cluster_edge_betweenness(g_ceb) 
+```
+
+```{r}
+l_ceb <- length(ceb)
+cat('The number of clusters by greedy optimization of modularity are',l_ceb,'\n')
+mod_ceb <- modularity(ceb)
+cat('The modularity coefficient is',mod_ceb,'\n')
+```
+
+```{r}
+table(membership(ceb))
+```
+
+```{r}
+# Plotting the histogram
+hist(membership(ceb), breaks = 30)
+```
+
+```{r}
+set.seed(1)
+
+V(g_ceb)$community <- ceb$membership
+
+plot(ceb, g_ceb, vertex.size=5, vertex.label=NA, asp=.5)
+```
+
+```{r}
+dendPlot(ceb, cex= .4)
+```
+
+## Hieragichal Clustering
+
+```{r, warning=FALSE}
+# Louvain Comunity Detection
+g_hc <- graph_from_data_frame(merged_edges, directed=FALSE)
+cluster <- cluster_louvain(g_hc)
+
+cluster_df <- data.frame(as.list(membership(cluster)))
+cluster_df <- as.data.frame(t(cluster_df))
+cluster_df$id <- rownames(cluster_df)
+
+# Create group column
+nodes <- left_join(nodes, cluster_df, by = "id")
+colnames(nodes)[4] <- "group"
+```
+
+```{r}
+mod_hc <- modularity(cluster)
+cat('The modularity coefficient is',mod_hc,'\n')
+```
+```{r}
+plot(cluster, g_hc, vertex.size=5, vertex.label=NA, asp=.5)
+```
+```{r}
+table(membership(cluster))
+```
+
+### Plot
+```{r message=FALSE, warning=FALSE}
+visNetwork(nodes, merged_edges, width = "100%") %>%
+  visIgraphLayout() %>%
+  visNodes(
+    shape = "dot",
+    color = list(
+      background = "#0085AF",
+      border = "#013848",
+      highlight = "#FF8000"
+    ),
+    shadow = list(enabled = TRUE, size = 10)
+  ) %>%
+  visEdges(
+    shadow = FALSE,
+    color = list(color = "#0085AF", highlight = "#C62F4B")
+  ) %>%
+  visOptions(highlightNearest = list(enabled = T, degree = 1, hover = T),
+             selectedBy = "group") %>% 
+  visLayout(randomSeed = 11)
+```
 
 
+NB: louvain cluster: It is based on the modularity measure and a hierarchical approach. Initially, each vertex is assigned to a community on its own. In every step, vertices are re-assigned to communities in a local, greedy way: *each vertex is moved to the community with which it achieves the highest contribution to modularity.* When no vertices can be reassigned, each community is considered a vertex on its own, and the process starts again with the merged communities. The process stops when there is only a single vertex left or when the modularity cannot be increased any more in a step. Since igraph 1.3, vertices are processed in a random order.
 
+# Subgraphing by Chapter
+```{r}
+chp_list <- list(chp_1, chp_2, chp_3, chp_4, chp_5)
+
+subgroups <- grouped_edges %>% 
+  group_split(Label)
+
+
+for (i in 1:length(chp_list)){
+  chp_list[[i]] <- graph_from_data_frame(subgroups[[i]], directed = FALSE)
+  E(chp_list[[i]])$weight <- subgroups[[i]]$n
+  
+  print(length(chp_list[[i]]))
+    
+  plot(chp_list[[i]])
+```
 
 
 
