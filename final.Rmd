@@ -1,0 +1,151 @@
+---
+title: "Les Miserables Project"
+author: "Pizi Maria Sofia"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Libraries
+```{r}
+# Load libraries
+library(readr)
+library(tidyverse)
+```
+
+# Data
+```{r upload, message=FALSE}
+nodes <- read_csv("jean-complete-node.csv")
+edges <- read_csv("jean-complete-edge.csv")
+```
+
+For simplicity reasons, we will rename the columns "Source" and "Target" of the dataset into "from" and "to" respectively. 
+```{r}
+nodes <- nodes %>%
+  rename("id" = "Id",
+         "label" = "Label")
+
+edges <- edges %>% 
+        rename("from" = "Source",
+               "to" = "Target")
+
+```
+
+## Check NAs and in case remove 
+```{r check for NA}
+table(is.na(edges))
+
+which(is.na(edges))
+edges[1097,]
+
+edges <- na.omit(edges)
+table(is.na(edges))
+```
+
+## Check for duplicate interactions in the dataset
+
+We group the dataframe "edges" by "from" and "to" columns and count the number of unique IDs.
+```{r message=FALSE, warning=FALSE}
+multiple_edges <- edges %>%
+  group_by(from, to) %>%
+  summarize(n = n()) %>%
+  group_by(from, to) %>%
+  filter(n > 1)
+
+multiple_edges
+```
+## merge with edges
+```{r}
+merged_edges <- edges %>%
+  left_join(multiple_edges, by = c("from", "to")) %>%
+  mutate(n = ifelse(is.na(n), 1, n)) %>%
+  distinct(from, to, .keep_all = TRUE)
+
+merged_edges
+```
+
+# Transform the dataframe into graph
+
+For visualization purposes we'll transform into graph both the edge dataframe (which contains multiedges) and the merged_edges dataframe which at this point will be a weighted graph. 
+
+```{r}
+# graph with duplicate interactions
+g <- graph_from_data_frame(edges, directed = FALSE)
+
+# graph without duplicate interactions, but weighted 
+g_w <- graph_from_data_frame(merged_edges, directed=FALSE)
+
+# Set the weights of the edges based on the 'n' column
+E(g_w)$weight <- merged_edges$n
+```
+
+## Plots of graphs
+```{r}
+library(visNetwork)
+
+vis <- toVisNetworkData(g)
+
+visNetwork(
+  nodes = vis$nodes,
+  edges = vis$edges,
+  width = "100%",
+  height = '600px'
+)
+```
+
+```{r}
+library(visNetwork)
+
+vis <- toVisNetworkData(g_w)
+
+visNetwork(
+  nodes = vis$nodes,
+  edges = vis$edges,
+  width = "100%",
+  height = '600px'
+)
+```
+
+# Analysis 
+```{r}
+# degree for each node
+table(degree(g_w))
+hist(degree(g_w), breaks = 50, ylim = c(0,110))
+```
+
+```{r}
+hist(graph.strength(g_w),breaks = 30, ylim = c(0,130))
+```
+
+```{r capo dei capo}
+s <- graph.strength(g_w)
+b <- betweenness(g_w)
+
+plot(s, b)
+```
+
+## Important actor
+```{r}
+ia <- order(b, decreasing=T)[1]
+which.max(b)
+
+name <- names(which.max(b))
+
+name_out <- nodes[nodes$id == name, ][2, 2]
+
+namename <- name_out$label
+
+cat('the important actor is',namename,'\n')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
