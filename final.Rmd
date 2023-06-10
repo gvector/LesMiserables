@@ -43,7 +43,6 @@ nodes <- nodes %>%
 edges <- edges %>% 
         rename("from" = "Source",
                "to" = "Target")
-
 ```
 
 ## Check NAs
@@ -71,7 +70,7 @@ multiple_edges <- edges %>%
 
 multiple_edges
 ```
-## merge with edges
+## Merge with edges
 We now merge the dataframes "edges" and "multiple_edges" in order to include the count of interactions between characters, making sure to take the distinct count of each interaction. 
 ```{r}
 merged_edges <- edges %>%
@@ -140,23 +139,33 @@ hist(degree(g_w), breaks = 50, ylim = c(0,110),
 The code degree(g_w) calculates the degree of each vertex in the graph, more in details the degree of a vertex in a graph represents the number of edges connected to that vertex.
 From the above chunk we see that the highest degree is 87, while there are most of the edges that have degree from 1 to 7. 
 
+## Transitivity 
+```{r}
+t <- transitivity(g_w)
+t
+```
+In general, transitivity refers to the measure of the likelihood that two vertices connected to a common neighbor are also connected to each other. It is calculated as the ratio of the number of triangles in a graph to the number of "open triads.", where a triad is a set of three vertices, and an open triad is a triad where at least one edge is missing.
+In this case, we have a transitivity value of 0.2894354 suggests a moderate level of clustering in the graph.
+
 ## Strength
 ```{r}
 s <- graph.strength(g_w)
-hist(s,breaks = 30, ylim = c(0,130))
+hist(s,breaks = 30, ylim = c(0,130), main= "Histogram of Strength",
+     xlab= "Strength")
 ```
 The code graph.strength(g_w) calculates the strength of each vertex in the graph, more in details the strength of a vertex in a graph is a measure of the sum of weights of the edges connected to that vertex. Hence, this measure is particularly useful when working with weighted graphs, which is the case of out graph where , as a remark, the weights of the edges are given by the count of the interactions between characters. 
 
 ## Betweeness
 ```{r}
 b <- betweenness(g_w)
-hist(b,breaks = 30)
+hist(b,breaks = 30, main= "Histogram of Betweeness",
+     xlab= "Betweeness")
 ```
 The code betweenness(g_w) calculates the betweenness centrality of each vertex in the graph, more in details betweenness centrality is a measure of how central or influential a vertex is in a graph based on the concept of shortest paths. In general, vertices with higher betweenness are considered more central in the network as they tend to lie on a higher number of shortest paths between other pairs of vertices.
 
 ## Betweeness and Strength
 ```{r}
-plot(s, b)
+plot(s, b, ylab="Betweeness", xlab= "Strength")
 ```
 The above scatter plot shows the relationship between the vertex strengths and their betweenness centrality in the graph. Each point on the plot represents a vertex, and its position corresponds to the strength and betweenness centrality values of that vertex.
 In general, vertices with higher strength values tend to have higher or lower betweenness centrality, indicating whether more influential vertices also tend to have stronger connections in the graph. 
@@ -204,6 +213,7 @@ mod0 <- lm(log(fd) ~ log(d), data=dd)
 cat('model with the fd transformed:', '\n')
 summary(mod0)
 ```
+From the above result of the linear model we have that the estimated intercept value is 4.0667, which represents the expected log-transformed frequency when the log-transformed degree is zero. The estimated coefficient for the log of the degree is -1.1670, which indicates the expected change in the log-transformed frequency for a one-unit increase in the log-transformed degree.
 
 ## Generalized Linear Model
 ```{r}
@@ -287,7 +297,7 @@ table(membership(ceb))
 We now plot the clustering method based on edge betweenness algorithm:
 ```{r}
 # Plotting the histogram
-hist(membership(ceb), breaks = 30)
+hist(membership(ceb), breaks = 30, xlab= "Clusters", main= "")
 ```
 
 ```{r}
@@ -356,21 +366,230 @@ visNetwork(nodes, merged_edges, width = "100%") %>%
 ```
 
 # Subgraphing by Chapter
+
+## Grouping by Chapters
 ```{r}
-chp_list <- list(chp_1, chp_2, chp_3, chp_4, chp_5)
-
-subgroups <- grouped_edges %>% 
-  group_split(Label)
-
-
-for (i in 1:length(chp_list)){
-  chp_list[[i]] <- graph_from_data_frame(subgroups[[i]], directed = FALSE)
-  E(chp_list[[i]])$weight <- subgroups[[i]]$n
-  
-  print(length(chp_list[[i]]))
-    
-  plot(chp_list[[i]])
+grouped_chap <- edges %>%
+  mutate(Label = str_extract(Label, "^\\d+"))
 ```
+
+```{r}
+subgroups <- grouped_chap %>% 
+  group_split(Label)
+```
+
+```{r, warning=FALSE, message=FALSE}
+chp <- vector(mode = "list", length = 5)
+
+for (i in 1:length(subgroups)) {
+  multiple_edges <- subgroups[[i]] %>%
+    group_by(from, to) %>%
+    summarize(n = n())
+  
+  chp[[i]] <- data.frame()
+  
+  chp[[i]] <- subgroups[[i]] %>%
+    left_join(multiple_edges, by = c("from", "to")) %>%
+    mutate(n = ifelse(is.na(n), 1, n)) %>%
+    distinct(from, to, .keep_all=TRUE)
+}
+```
+
+```{r}
+g_chp <- vector(mode = "list", length = 5)
+
+for (k in 1:length(chp)) {
+  g_chp[[k]] <- graph_from_data_frame(chp[[k]], directed=FALSE)
+  print(is.simple(g_chp[[k]]))
+}
+```
+# Plots of subgraphs
+
+## Chapter 1
+```{r}
+vis_g_c1 <- toVisNetworkData(g_chp[[1]])
+
+visNetwork(
+  nodes = vis_g_c1$nodes,
+  edges = vis_g_c1$edges,
+  width = "100%",
+  height = '600px'
+)
+```
+
+## Chapter 2
+```{r}
+vis_g_c2 <- toVisNetworkData(g_chp[[2]])
+
+visNetwork(
+  nodes = vis_g_c2$nodes,
+  edges = vis_g_c2$edges,
+  width = "100%",
+  height = '600px'
+)
+```
+
+## Chapter 3
+```{r}
+vis_g_c3 <- toVisNetworkData(g_chp[[3]])
+
+visNetwork(
+  nodes = vis_g_c3$nodes,
+  edges = vis_g_c3$edges,
+  width = "100%",
+  height = '600px'
+)
+```
+
+## Chapter 4
+```{r}
+vis_g_c4 <- toVisNetworkData(g_chp[[4]])
+
+visNetwork(
+  nodes = vis_g_c4$nodes,
+  edges = vis_g_c4$edges,
+  width = "100%",
+  height = '600px'
+)
+```
+
+## Chapter 5
+```{r}
+vis_g_c5 <- toVisNetworkData(g_chp[[5]])
+
+visNetwork(
+  nodes = vis_g_c5$nodes,
+  edges = vis_g_c5$edges,
+  width = "100%",
+  height = '600px'
+)
+```
+
+# Analysis on subgraphs
+
+## Transitivity subgraphs
+```{r}
+t_c1 <- transitivity(g_chp[[1]])
+t_c2 <- transitivity(g_chp[[2]])
+t_c3 <- transitivity(g_chp[[3]])
+t_c4 <- transitivity(g_chp[[4]])
+t_c5 <- transitivity(g_chp[[5]])
+
+trans_tab <- cbind(t_c1, t_c2, t_c3,t_c4,t_c5)
+trans_tab
+```
+
+## Degree subgraphs
+```{r}
+par(mfrow = c(2, 3))
+d_c1 <- degree(g_chp[[1]])
+hist(d_c1)
+d_c2 <- degree(g_chp[[2]])
+hist(d_c2)
+d_c3 <- degree(g_chp[[3]])
+hist(d_c3)
+d_c4 <- degree(g_chp[[4]])
+hist(d_c4)
+d_c5 <- degree(g_chp[[5]])
+hist(d_c5)
+hist(degree(g_w))
+```
+## Strength subgraphs
+```{r}
+par(mfrow = c(2, 3))
+s_c1 <- graph.strength(g_chp[[1]])
+hist(s_c1)
+s_c2 <- graph.strength(g_chp[[2]])
+hist(s_c2)
+s_c3 <- graph.strength(g_chp[[3]])
+hist(s_c3)
+s_c4 <- graph.strength(g_chp[[4]])
+hist(s_c4)
+s_c5 <- graph.strength(g_chp[[5]])
+hist(s_c5)
+hist(s)
+```
+## Betweeness subgraphs
+```{r}
+par(mfrow = c(2, 3))
+b_c1 <- betweenness(g_chp[[1]])
+hist(b_c1)
+b_c2 <- betweenness(g_chp[[2]])
+hist(b_c2)
+b_c3 <- betweenness(g_chp[[3]])
+hist(b_c3)
+b_c4 <- betweenness(g_chp[[4]])
+hist(b_c4)
+b_c5 <- betweenness(g_chp[[5]])
+hist(b_c5)
+hist(b)
+```
+
+## Plot Betweeness vs Strength subgraphs
+```{r}
+par(mfrow = c(2, 3))
+plot(s_c1, b_c1, ylab="Betweeness", xlab= "Strength")
+plot(s_c2, b_c2, ylab="Betweeness", xlab= "Strength")
+plot(s_c3, b_c3, ylab="Betweeness", xlab= "Strength")
+plot(s_c4, b_c4, ylab="Betweeness", xlab= "Strength")
+plot(s_c5, b_c5, ylab="Betweeness", xlab= "Strength")
+plot(s,b)
+```
+
+## best actor
+```{r}
+ia <- order(b_c1, decreasing=T)[1:2]
+
+b_c1[ia[1]]
+b_c1[ia[2]]
+
+name <- names(b_c1[ia])
+
+name_out <- nodes[nodes$id == name, ]
+
+namename <- name_out$label
+namename[1]
+namename[3]
+
+cat('The important actor is',namename,'\n')
+```
+
+
+```{r, warning=FALSE}
+b_c <- list(b_c1, b_c2, b_c3, b_c4, b_c5)
+
+for (i in 1:length(g_chp)){
+  ia <- order(b_c[[i]], decreasing=T)[1:2]
+  name <- names(b_c[[i]][ia])
+  name_out <- nodes[nodes$id == name, ]
+  name_out_1 <- nodes[nodes$id == name[1], ]; name_out_1 <- na.omit(name_out_1)
+  name_out_2 <- nodes[nodes$id == name[2], ]; name_out_2 <- na.omit(name_out_2)
+  namename_1 <- name_out_1$label
+  namename_2 <- name_out_2$label
+  
+  cat('The important actors in chaptet', i,'are:',namename_1, 'and', namename_2,'\n')
+}
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
