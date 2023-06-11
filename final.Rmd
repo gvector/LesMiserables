@@ -9,6 +9,7 @@ output: html_document
 ```{r}
 # Load libraries
 library(readr)
+library(igraph)
 library(tidyverse)
 library(visNetwork)
 ```
@@ -182,7 +183,7 @@ name_out <- nodes[nodes$id == name, ][2, 2]
 
 namename <- name_out$label
 
-cat('The important actor is',namename,'\n')
+cat('The most important actor in the network is',namename,'\n')
 ```
 
 ## Degree distribution
@@ -203,7 +204,8 @@ with(dd, plot(log(d), log(fd)))
 ```
 The degree_dist function calculates the degree distribution of the graph, which means it computes the frequency distribution of the degrees (number of edges incident to each vertex) in the graph and it then returns a list with two elements: the degree values and their corresponding frequency counts.
 We then plot and visualize the degree distribution in logarithmic scales, more specifically to check if the degree distribution follows a power-law pattern.
-In this case *??????????*
+*FINISCI*
+In this case ???????
 
 # Models
 
@@ -214,6 +216,7 @@ cat('model with the fd transformed:', '\n')
 summary(mod0)
 ```
 From the above result of the linear model we have that the estimated intercept value is 4.0667, which represents the expected log-transformed frequency when the log-transformed degree is zero. The estimated coefficient for the log of the degree is -1.1670, which indicates the expected change in the log-transformed frequency for a one-unit increase in the log-transformed degree.
+Moreover, we see a Multiple R-squared 0.7249, indicating that 72.49% of the variance in the response variable can be explained by the predictor variable and, looking at the overall significance of the model, the extremely low p-value (6.824e-08) suggests strong evidence against the null hypothesis, indicating that the relationship is significant.
 
 ## Generalized Linear Model
 ```{r}
@@ -221,6 +224,9 @@ mod1 <- glm(fd ~ log(d), family = poisson, data=dd)
 cat('model without the fd transformed:', '\n')
 summary(mod1)
 ```
+The above model analyses the relationship between the frequency of degrees and the logarithm of degrees in the network.
+From the results we see that the estimated intercept is 5.2376, and the estimated coefficient for log(d) is -1.6570. These values represent the average effect on the log of the expected frequency for a one-unit change in the logarithm of degrees, moreover both coefficients have extremely small p-values (<2e-16), indicating a highly significant relationship between the predictor variable and the response variable.
+Added to that, the deviance values indicate that the model explains a substantial portion of the variation in the data and the relatively low AIC value suggests a good balance between model complexity and fit to the data.
 
 ### Plot
 ```{r}
@@ -228,6 +234,8 @@ with(dd, plot(log(d),log(fd)))
 abline(a=mod0$coef[1],b=mod0$coef[2], col='red')
 abline(a=mod1$coef[1],b=mod1$coef[2], col='blue')
 ```
+*FINISCI*
+From the above plot, the model which fits the best is the GLM. 
 
 ## ERGM model
 ```{r message=FALSE, warning=FALSE}
@@ -236,6 +244,8 @@ am <- get.adjacency(g_w, sparse = FALSE)
 g_ergm <-as.network(am, directed = FALSE)
 ergm(g_ergm~edges) %>% summary
 ```
+In general, the Exponential Random Graph Model is a statistical model used to analyze and understand the patterns and processes in network data and it estimates the effect of the edges predictor on the network structure. 
+In this case, the estimated coefficient for the edges predictor is -3.46612the. This negative coefficient suggests that the presence of edges in the network is associated with a decrease in the network structure according to the mode hence, the presence of edges has a negative effect on the network. Moreover, the model suggests that the network tends to have fewer edges than would be expected by chance.
 
 # Clustering
 We now perform some clustering analysis using different methods such as fast greedy algorithm, edge betweenness clustering algorithm, and Louvain community detection algorithm. Furthermore, we'll also look at the modularity scores which quantifies the quality of the community structure within the network. 
@@ -365,6 +375,12 @@ visNetwork(nodes, merged_edges, width = "100%") %>%
   visLayout(randomSeed = 11)
 ```
 
+## Modularity scores table
+```{r}
+mod_tab <- cbind(mod_kc, mod_ceb, mod_hc)
+mod_tab
+```
+
 # Subgraphing by Chapter
 
 ## Grouping by Chapters
@@ -465,7 +481,7 @@ visNetwork(
 )
 ```
 
-# Analysis on subgraphs
+a# Analysis on subgraphs
 
 ## Transitivity subgraphs
 ```{r}
