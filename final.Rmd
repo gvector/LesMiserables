@@ -163,14 +163,15 @@ The code `graph.strength(g_w)` calculates the **strength** of each vertex in the
 ## Betweenness
 ```{r}
 b <- betweenness(g_w)
-hist(b, breaks = 40, main= "Histogram of Betweenness",
-     xlab= "Betweenness")
+hist(b, breaks = 40, main= "Histogram of Betweenness", xlim=c(0, 10000),
+     xlab= "Betweenness", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
 ```
 The code `betweenness(g_w)` calculates the **betweenness centrality** of each vertex in the graph, more in details betweenness centrality is a measure of how *central* or *influential* a vertex is in a graph based on the concept of shortest paths. In general, vertices with higher betweenness are considered more central in the network as they tend to lie on a higher number of shortest paths between other pairs of vertices.
 
 ## Betweenness and Strength
 ```{r}
-plot(s, b, ylab="Betweenness", xlab= "Strength", main= "Betweenness vs Strength")
+plot(s, b, ylab="Betweenness", xlab= "Strength", main= "Betweenness vs Strength", pch=16, 
+     col=hcl.colors(length(b), rev = F,palette = "plasma"))
 ```
 The above scatter plot shows the relationship between the vertex strength and their betweenness entrality in the graph. Each point on the plot represents a vertex, and its position corresponds to the strength and betweenness centrality values of that vertex.
 In general, vertices with higher strength values tend to have higher or lower betweenness centrality, indicating whether more influential vertices also tend to have stronger connections in the graph. 
@@ -196,7 +197,7 @@ degree_dist <- function(graph) {
 }
 dd <- degree_dist(g_w)
 
-with(dd, plot(log(d), log(fd), main="Degree Distribution", xlab="Degree", ylab="Frequency of each Degree"))
+with(dd, plot(log(d), log(fd), main="Degree Distribution", xlab="Degree", ylab="Frequency of each Degree", pch=16, col=hcl.colors(length(b), rev = F, palette= 'blues')))
 ```
 The `degree_dist()` function calculates the degree distribution of the graph, which means it computes the frequency distribution of the degrees (number of edges incident to each vertex) in the graph and it then returns a list with two elements: the degree values and their corresponding frequency counts.
 We then plot and visualize the degree distribution in logarithmic scales, more specifically to check if the degree distribution follows a *power-law pattern*.
@@ -229,9 +230,11 @@ Added to that, the deviance values indicate that the model explains a substantia
 
 ### Plot
 ```{r}
-with(dd, plot(log(d),log(fd)))
-abline(a=mod0$coef[1],b=mod0$coef[2], col='red')
-abline(a=mod1$coef[1],b=mod1$coef[2], col='blue')
+with(dd, plot(log(d),log(fd),main="Degree Distribution", xlab="Degree", ylab="Frequency of each Degree", pch=16, col=hcl.colors(length(b), rev = F, palette= 'blues')))
+abline(a=mod0$coef[1],b=mod0$coef[2], col='red', lwd=3)
+abline(a=mod1$coef[1],b=mod1$coef[2], col='blue', lwd=3)
+legend("topright", legend = c("Linear Model", "Poisson"), col = c("red", "blue"), lwd = 2)
+
 # aggiungere legend
 ```
 *FINISCI*
@@ -277,14 +280,16 @@ V(g_kc)$community <- kc$membership
 
 colors <- adjustcolor(col = c("red", "orange", "yellow", "green", "blue", "#4b0082", "violet"), alpha=1)
 
-plot(kc, g_kc, vertex.size=5, , vertex.color=colors[V(g_kc)$community], vertex.label=NA, asp=.5)
+plot(kc, g_kc, vertex.size=5, , vertex.color=colors[V(g_kc)$community], vertex.label=NA, asp=.5, main="Fast Greedy Clustering")
 ```
 
 ```{r}
 # dendrogram based on kc
 ## add a LEGEND
+dend_col <- c("red", "orange", "yellow", "green", "blue", "#4b0082", "violet")
 par(cex=.4)
-plot_dendrogram(kc, mode = 'hclust', colbar=c("red", "orange", "yellow", "green", "blue", "#4b0082", "violet"))
+plot_dendrogram(kc, mode = 'hclust', colbar=dend_col, axes=FALSE)
+legend("topright", legend=c(1:length(kc)), col=dend_col, lwd=2)
 ```
 
 ## Cluster by Edge Betweenness
@@ -308,7 +313,7 @@ table(membership(ceb))
 We now plot the clustering method based on edge betweenness algorithm:
 ```{r}
 # Plotting the histogram
-hist(membership(ceb), breaks = 30, xlim=c(0,50), xlab= "Clusters", main= "Cluster Memebership distribution")
+hist(membership(ceb), breaks = 30, xlim=c(0,50), xlab= "Clusters", main= "Cluster Memebership distribution", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
 ```
 
 ```{r}
@@ -316,7 +321,7 @@ set.seed(123456)
 
 V(g_ceb)$community <- ceb$membership
 
-plot(ceb, g_ceb, vertex.size=5, vertex.label=NA, asp=.5)
+plot(ceb, g_ceb, vertex.size=5, vertex.label=NA, asp=.5, main="Edge Bewteennes Clustering")
 ```
 
 ```{r}
@@ -352,7 +357,7 @@ We now plot the clustering method based on the Louvain algorithm:
 ```{r}
 set.seed(123456)
 
-plot(cluster, g_hc, vertex.size=5, vertex.label=NA, asp=.5)
+plot(cluster, g_hc, vertex.size=5, vertex.label=NA, asp=.5, main="Louvain Clustering")
 ```
 ```{r}
 table(membership(cluster))
@@ -506,61 +511,59 @@ trans_tab
 
 ### Degree subgraphs
 ```{r}
-# modificare breacks, titoli, commento
 par(mfrow = c(2, 3))
 d_c1 <- degree(g_chp[[1]])
-hist(d_c1)
 d_c2 <- degree(g_chp[[2]])
-hist(d_c2)
 d_c3 <- degree(g_chp[[3]])
-hist(d_c3)
 d_c4 <- degree(g_chp[[4]])
-hist(d_c4)
 d_c5 <- degree(g_chp[[5]])
-hist(d_c5)
-hist(degree(g_w))
+hist(d_c1, breaks=15, xlab="Degree", main="Degree of Chapter1", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(d_c2, breaks=15, xlab="Degree", main="Degree of Chapter2", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(d_c3, breaks=15, xlab="Degree", main="Degree of Chapter3", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(d_c4, breaks=15, xlab="Degree", main="Degree of Chapter4", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(d_c5, breaks=15, xlab="Degree", main="Degree of Chapter5", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(degree(g_w), xlab="Degree", main="Degree of Full Book", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
 ```
 ### Strength subgraphs
 ```{r}
-# stesso su
 par(mfrow = c(2, 3))
 s_c1 <- graph.strength(g_chp[[1]])
-hist(s_c1)
 s_c2 <- graph.strength(g_chp[[2]])
-hist(s_c2)
 s_c3 <- graph.strength(g_chp[[3]])
-hist(s_c3)
 s_c4 <- graph.strength(g_chp[[4]])
-hist(s_c4)
 s_c5 <- graph.strength(g_chp[[5]])
-hist(s_c5)
-hist(s)
+hist(s_c1, main="Strength of chapter1", xlab="strength", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(s_c2, main="Strength of chapter2", xlab="strength", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(s_c3, main="Strength of chapter3", xlab="strength", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(s_c4, main="Strength of chapter4", xlab="strength", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(s_c5, main="Strength of chapter5", xlab="strength", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(s, main="Strength of Full Book", xlab="strength", col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
 ```
 ### Betweenness subgraphs
 ```{r}
 par(mfrow = c(2, 3))
 b_c1 <- betweenness(g_chp[[1]])
-hist(b_c1)
 b_c2 <- betweenness(g_chp[[2]])
-hist(b_c2)
 b_c3 <- betweenness(g_chp[[3]])
-hist(b_c3)
 b_c4 <- betweenness(g_chp[[4]])
-hist(b_c4)
 b_c5 <- betweenness(g_chp[[5]])
-hist(b_c5)
-hist(b)
+hist(b_c1, main="Betweenness of Chapter1", xlab="Betweenness", breaks=20, col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(b_c2, main="Betweenness of Chapter2", xlab="Betweenness", breaks=20, col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(b_c3, main="Betweenness of Chapter3", xlab="Betweenness", breaks=10, col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(b_c4, main="Betweenness of Chapter4", xlab="Betweenness", breaks=10, col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(b_c5, main="Betweenness of Chapter5", xlab="Betweenness", breaks=10, col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
+hist(b, main="Betweenness of Full Book", xlab="Betweenness", breaks=30, col=hcl.colors(length(b), rev = F, palette= 'blues'), border="black")
 ```
 
 ### Plot Betweenness vs Strength subgraphs
 ```{r}
 par(mfrow = c(2, 3))
-plot(s_c1, b_c1, ylab="Betweenness", xlab= "Strength")
-plot(s_c2, b_c2, ylab="Betweenness", xlab= "Strength")
-plot(s_c3, b_c3, ylab="Betweenness", xlab= "Strength")
-plot(s_c4, b_c4, ylab="Betweenness", xlab= "Strength")
-plot(s_c5, b_c5, ylab="Betweenness", xlab= "Strength")
-plot(s,b)
+plot(s_c1, b_c1, ylab="Betweenness", xlab= "Strength", main="Bet vs Stre in Chapter1", pch=16, col=hcl.colors(length(b), rev = F, palette= 'blues'))
+plot(s_c2, b_c2, ylab="Betweenness", xlab= "Strength", main="Bet vs Stre in Chapter2", pch=16, col=hcl.colors(length(b), rev = F, palette= 'blues'))
+plot(s_c3, b_c3, ylab="Betweenness", xlab= "Strength", main="Bet vs Stre in Chapter3", pch=16, col=hcl.colors(length(b), rev = F, palette= 'blues'))
+plot(s_c4, b_c4, ylab="Betweenness", xlab= "Strength", main="Bet vs Stre in Chapter4", pch=16, col=hcl.colors(length(b), rev = F, palette= 'blues'))
+plot(s_c5, b_c5, ylab="Betweenness", xlab= "Strength", main="Bet vs Stre in Chapter5", pch=16, col=hcl.colors(length(b), rev = F, palette= 'blues'))
+plot(s,b, ylab="Betweenness", xlab= "Strength", main="Bet vs Stre in Full Book", pch=16, col=hcl.colors(length(b), rev = F, palette= 'blues'))
 ```
 
 ## Important Actors
