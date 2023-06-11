@@ -98,7 +98,6 @@ E(g_w)$weight <- merged_edges$n
 ```
 
 ```{r}
-## aggiungere colori
 hist(E(g_w)$weight, breaks = 25,
      xlab= "Weights", main="Edges' Weight Distribution", col = 'blue', border = 'white')
 ```
@@ -170,8 +169,7 @@ The code `betweenness(g_w)` calculates the **betweenness centrality** of each ve
 
 ## Betweenness and Strength
 ```{r}
-plot(s, b, ylab="Betweenness", xlab= "Strength", main= "Betweenness vs Strength", pch=16, 
-     col=hcl.colors(length(b), rev = F,palette = "plasma"))
+plot(s, b, ylab="Betweenness", xlab= "Strength", main= "Betweenness vs Strength", pch=16, col=hcl.colors(length(b), rev = F, palette= 'blues'))
 ```
 The above scatter plot shows the relationship between the vertex strength and their betweenness entrality in the graph. Each point on the plot represents a vertex, and its position corresponds to the strength and betweenness centrality values of that vertex.
 In general, vertices with higher strength values tend to have higher or lower betweenness centrality, indicating whether more influential vertices also tend to have stronger connections in the graph. 
