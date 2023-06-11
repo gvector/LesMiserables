@@ -589,4 +589,4 @@ After that we examined the Degree Distribution Analysis of the Network looking f
 We then performed Clustering Analysis, computing different methods, in order to find out the best way to divide our network into Communities.
 Lastly, we decided to divide the Network not following clustering algorithms, but using instead the insights of the dataset, meaning the Chapter Label. From this last analysis, we found out how the different descriptive characteristics of the network changed between the different chapters and also how the characters are distributed in the book. 
 
-Link to our project repository: ([https://github.com/gvector/LesMiserables](URL))
+Link to our project repository: ([https://github.com/gvector/LesMiserables.git](URL))
